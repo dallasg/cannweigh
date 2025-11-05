@@ -1,12 +1,671 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Hello, World!</title>
-	</head>
-	<body>
-		<h1 id="heading">Hello, World!</h1>
-		<p>This page comes from a static asset stored at `public/index.html` as configured in `wrangler.jsonc`.</p>
-	</body>
+<head>
+  <meta charset="utf-8" />
+  <title>Deli Vault Weighing & Log</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#171a21; --muted:#8a93a6; --text:#e8ecf3;
+      --accent:#79b8ff; --accent-2:#5ee1a1; --warn:#ffb86b; --danger:#ff6b6b; --line:#222634;
+      --chip:#1f2431; --chip-2:#212b29;
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(180deg, #0e1014, #10131a 40%, #0e1116);
+      color:var(--text); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height:1.35;
+    }
+    header{
+      padding:18px 22px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--line);
+      position:sticky; top:0; z-index:5; backdrop-filter:saturate(120%) blur(8px); background:rgba(15,17,21,0.75);
+    }
+    .logo{
+      width:38px; height:38px; border-radius:10px; background:radial-gradient(120% 120% at 20% 20%, #79b8ff 0, #5ee1a1 42%, #7a5cff 80%);
+      box-shadow:0 8px 30px rgba(121,184,255,.25), inset 0 0 0 1px rgba(255,255,255,.15);
+    }
+    h1{font-size:18px; margin:0 8px 0 0; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:12px}
+    .row{display:flex; flex-wrap:wrap; gap:12px}
+    .spacer{flex:1}
+    main{max-width:1100px; margin:28px auto; padding:0 18px 60px}
+    .card{
+      background:linear-gradient(180deg, #141823, #121620);
+      border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    .grid{display:grid; gap:14px}
+    .grid.cols-2{grid-template-columns:1fr 1fr}
+    .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+    label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
+    input[type="text"], input[type="number"], select, textarea{
+      width:100%; padding:12px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1320; color:var(--text);
+      outline:none; transition:border-color .15s ease, box-shadow .15s ease; font-size:14px;
+    }
+    input:focus, select:focus, textarea:focus{border-color:#2c87ff; box-shadow:0 0 0 4px rgba(44,135,255,.15)}
+    textarea{resize:vertical; min-height:72px}
+    .controls{display:flex; gap:10px; flex-wrap:wrap}
+    button{
+      appearance:none; border:none; background:var(--chip); color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer;
+      font-weight:600; letter-spacing:.2px; border:1px solid var(--line);
+    }
+    button.primary{background:linear-gradient(180deg, #1c65f2, #184fd3); border-color:#1b4cc9}
+    button.good{background:linear-gradient(180deg, #1f8a59, #166b46); border-color:#1d6e50}
+    button.warn{background:linear-gradient(180deg, #9b6a1f, #875113); border-color:#7e4a0f}
+    button.ghost{background:transparent}
+    button:disabled{opacity:.5; cursor:not-allowed}
+    .chip{display:inline-flex; align-items:center; gap:8px; background:var(--chip-2); border:1px solid var(--line); padding:7px 10px; border-radius:999px; font-size:12px; color:#e6eefb}
+    .chip b{font-weight:700}
+    .table-wrap{overflow:auto; border-radius:12px; border:1px solid var(--line)}
+    table{width:100%; border-collapse:collapse; min-width:860px; background:#0f1320}
+    th, td{padding:12px 10px; border-bottom:1px solid #1a1f2c; text-align:left; font-size:14px}
+    th{position:sticky; top:0; background:#13192a; z-index:1; font-weight:600; color:#cfd6e6}
+    tbody tr:hover{background:#121a2d}
+    .right{text-align:right}
+    .muted{color:var(--muted)}
+    .pill{padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line)}
+    .pill.am{background:#12253f; color:#89c2ff}
+    .pill.pm{background:#1e2a1f; color:#96e2b9}
+    .pill.warn{background:#382512; color:#ffcf8a; border-color:#6b4a23}
+    .pill.danger{background:#3a1515; color:#ffc1c1; border-color:#6b2323}
+    .footer-note{color:var(--muted); font-size:12px; margin-top:10px}
+    .section-title{margin:22px 0 10px; font-size:14px; color:#dbe5ff; letter-spacing:.3px}
+    .kpi{display:flex; gap:12px; flex-wrap:wrap}
+    .kpi .box{background:#0f1320; border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:140px}
+    .kpi .box b{font-size:18px; display:block; margin-top:2px}
+    .danger-text{color:#ff8e8e}
+    .success-text{color:#85efc3}
+    .note{font-size:12px; color:var(--muted)}
+    .wrap{display:flex; gap:18px; flex-wrap:wrap}
+    .wrap > *{flex:1 1 300px}
+    @media (max-width:850px){
+      .grid.cols-3{grid-template-columns:1fr}
+      .grid.cols-2{grid-template-columns:1fr}
+      header{gap:10px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo" aria-hidden="true"></div>
+    <div>
+      <h1>Deli Vault Weighing</h1>
+      <div class="sub">Scan → Weigh → Log. AM & PM sessions. CSV export.</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="chip"><span>Variance threshold:</span> <b id="thresholdChip">5 g</b></div>
+    <button class="ghost" id="openSettingsBtn" title="Settings">⚙️ Settings</button>
+  </header>
+
+  <main>
+    <!-- Session Card -->
+    <section class="card" id="sessionCard" aria-labelledby="sessionHeading">
+      <div class="wrap">
+        <div>
+          <div id="sessionHeading" class="section-title">Session details</div>
+          <div class="grid cols-3">
+            <div>
+              <label for="employeeInput">Employee</label>
+              <input id="employeeInput" type="text" placeholder="Your name" autocomplete="name" />
+            </div>
+            <div>
+              <label for="sessionType">Session</label>
+              <select id="sessionType">
+                <option value="AM">Morning (AM)</option>
+                <option value="PM">Evening (PM)</option>
+              </select>
+            </div>
+            <div>
+              <label for="sessionDate">Date</label>
+              <input id="sessionDate" type="date" />
+            </div>
+          </div>
+          <div class="footer-note">Tip: press <b>/</b> to jump to the scanner input.</div>
+        </div>
+
+        <div>
+          <div class="section-title">Quick stats</div>
+          <div class="kpi">
+            <div class="box"><span class="muted">Entries today</span> <b id="statEntries">0</b></div>
+            <div class="box"><span class="muted">Flagged variances</span> <b id="statFlags">0</b></div>
+            <div class="box"><span class="muted">Products in registry</span> <b id="statProducts">0</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scan & Weigh -->
+    <section class="card" aria-labelledby="scanHeading" style="margin-top:18px">
+      <div class="grid cols-2">
+        <div>
+          <div id="scanHeading" class="section-title">Scan vault & weigh</div>
+          <div class="grid cols-3">
+            <div>
+              <label for="scanInput">Scan / Enter Product ID</label>
+              <input id="scanInput" type="text" placeholder="Scan barcode or type Product ID" autofocus />
+            </div>
+            <div>
+              <label for="vaultSize">Vault</label>
+              <select id="vaultSize">
+                <option value="BIG">Big (BOH)</option>
+                <option value="SMALL">Small (FOH)</option>
+              </select>
+            </div>
+            <div>
+              <label for="grossInput">Gross weight (g)</label>
+              <input id="grossInput" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 487.32" />
+            </div>
+          </div>
+
+          <div class="grid cols-3" style="margin-top:14px">
+            <div>
+              <label for="tareInput">Tare (auto)</label>
+              <input id="tareInput" type="number" step="0.01" inputmode="decimal" placeholder="Auto from registry" disabled />
+            </div>
+            <div>
+              <label for="netOutput">Net product (g)</label>
+              <input id="netOutput" type="number" step="0.01" inputmode="decimal" disabled />
+            </div>
+            <div>
+              <label for="varianceOutput">Variance vs last (g)</label>
+              <input id="varianceOutput" type="number" step="0.01" inputmode="decimal" disabled />
+            </div>
+          </div>
+
+          <div class="grid cols-3" style="margin-top:14px">
+            <div>
+              <label for="notesInput">Notes (optional)</label>
+              <input id="notesInput" type="text" placeholder="e.g. Refilled FOH 1 oz" />
+            </div>
+            <div class="controls" style="align-items:flex-end">
+              <button class="primary" id="addEntryBtn">➕ Add entry</button>
+              <button id="clearFormBtn">Clear</button>
+            </div>
+          </div>
+          <div class="note" style="margin-top:8px">
+            Scales: type the gross weight from the display. (Advanced: you can wire a HID/Serial scale later and auto-fill gross.)
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">Product registry (Product ID → Tare & Name)</div>
+          <div class="grid cols-3">
+            <div>
+              <label for="regId">Product ID</label>
+              <input id="regId" type="text" placeholder="e.g. STR-GLW-3.5" />
+            </div>
+            <div>
+              <label for="regName">Name</label>
+              <input id="regName" type="text" placeholder="Strain or SKU name" />
+            </div>
+            <div>
+              <label for="regTare">Tare (g)</label>
+              <input id="regTare" type="number" step="0.01" inputmode="decimal" placeholder="Empty vault weight" />
+            </div>
+          </div>
+          <div class="controls" style="margin-top:10px">
+            <button class="good" id="saveProductBtn">💾 Save / Update</button>
+            <button class="ghost" id="deleteProductBtn">🗑️ Delete</button>
+            <button class="ghost" id="importSampleBtn">📥 Load demo data</button>
+            <button class="ghost" id="exportRegistryBtn">⬇️ Export registry CSV</button>
+          </div>
+          <div class="footer-note">Tare is tied to the Product ID. Only update tare if the container changes.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Entries Table -->
+    <section class="card" aria-labelledby="logHeading" style="margin-top:18px">
+      <div class="wrap">
+        <div class="controls">
+          <div id="logHeading" class="section-title" style="margin-right:6px">Log entries</div>
+          <span class="pill am" id="sessionPill">AM</span>
+        </div>
+        <div class="spacer"></div>
+        <div class="controls">
+          <button id="finalizeBtn" class="good">✅ Finalize session</button>
+          <button id="exportCsvBtn">⬇️ Export log CSV</button>
+          <button id="clearTodayBtn" class="warn">🧹 Clear today (keeps history)</button>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:10px">
+        <table id="logTable" aria-describedby="logHelp">
+          <thead>
+            <tr>
+              <th style="width:120px">Time</th>
+              <th style="width:70px">Session</th>
+              <th>Vault</th>
+              <th>Product ID</th>
+              <th>Name</th>
+              <th class="right">Tare (g)</th>
+              <th class="right">Gross (g)</th>
+              <th class="right">Net (g)</th>
+              <th class="right">Variance (g)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+      <div id="logHelp" class="footer-note">Variance compares this entry’s net to your previous net for the same Product ID & vault.</div>
+    </section>
+
+    <!-- Settings Modal -->
+    <dialog id="settingsDlg">
+      <form method="dialog" class="card" style="width:min(680px, 92vw); padding:16px">
+        <h3 style="margin:6px 0 12px">Settings</h3>
+        <div class="grid cols-2">
+          <div>
+            <label for="thresholdInput">Variance threshold (g)</label>
+            <input id="thresholdInput" type="number" step="0.01" inputmode="decimal" />
+            <div class="note">Entries with |variance| above this are highlighted for review.</div>
+          </div>
+          <div>
+            <label for="storeNameInput">Store / Location (optional)</label>
+            <input id="storeNameInput" type="text" placeholder="e.g. Verts – Arlington" />
+          </div>
+        </div>
+        <div class="controls" style="margin-top:14px">
+          <button class="primary">Save</button>
+          <button class="ghost" value="cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <script>
+  ;(() => {
+    // ------------------ Storage helpers ------------------
+    const KEY_REGISTRY = 'dv_registry_v1';
+    const KEY_LOG = 'dv_log_v1';
+    const KEY_SETTINGS = 'dv_settings_v1';
+
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    const todayStr = () => {
+      const d = new Date();
+      // normalize to local yyyy-mm-dd
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const da = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${da}`;
+    };
+
+    const state = {
+      registry: loadRegistry(),
+      log: loadLog(),
+      settings: loadSettings(),
+    };
+
+    function loadRegistry(){ return JSON.parse(localStorage.getItem(KEY_REGISTRY) || '{}'); }
+    function saveRegistry(){ localStorage.setItem(KEY_REGISTRY, JSON.stringify(state.registry)); updateStats(); }
+    function loadLog(){ return JSON.parse(localStorage.getItem(KEY_LOG) || '[]'); }
+    function saveLog(){ localStorage.setItem(KEY_LOG, JSON.stringify(state.log)); updateStats(); renderLog(); }
+    function loadSettings(){
+      const defaults = { varianceThreshold: 5, storeName: '' };
+      try { return Object.assign(defaults, JSON.parse(localStorage.getItem(KEY_SETTINGS) || '{}')); }
+      catch { return defaults; }
+    }
+    function saveSettings(){ localStorage.setItem(KEY_SETTINGS, JSON.stringify(state.settings)); updateThresholdChip(); }
+
+    // ------------------ Elements ------------------
+    const employeeInput = $('#employeeInput');
+    const sessionType = $('#sessionType');
+    const sessionDate = $('#sessionDate');
+    const sessionPill = $('#sessionPill');
+    const scanInput = $('#scanInput');
+    const vaultSize = $('#vaultSize');
+    const grossInput = $('#grossInput');
+    const tareInput = $('#tareInput');
+    const netOutput = $('#netOutput');
+    const varianceOutput = $('#varianceOutput');
+    const notesInput = $('#notesInput');
+    const addEntryBtn = $('#addEntryBtn');
+    const clearFormBtn = $('#clearFormBtn');
+
+    const regId = $('#regId');
+    const regName = $('#regName');
+    const regTare = $('#regTare');
+    const saveProductBtn = $('#saveProductBtn');
+    const deleteProductBtn = $('#deleteProductBtn');
+    const importSampleBtn = $('#importSampleBtn');
+    const exportRegistryBtn = $('#exportRegistryBtn');
+
+    const logBody = $('#logBody');
+    const exportCsvBtn = $('#exportCsvBtn');
+    const finalizeBtn = $('#finalizeBtn');
+    const clearTodayBtn = $('#clearTodayBtn');
+
+    const statEntries = $('#statEntries');
+    const statFlags = $('#statFlags');
+    const statProducts = $('#statProducts');
+    const thresholdChip = $('#thresholdChip');
+    const openSettingsBtn = $('#openSettingsBtn');
+    const settingsDlg = $('#settingsDlg');
+    const thresholdInput = $('#thresholdInput');
+    const storeNameInput = $('#storeNameInput');
+
+    // ------------------ Init ------------------
+    function init(){
+      sessionDate.value = todayStr();
+      updateThresholdChip();
+      updateStats();
+      renderLog();
+
+      // Keyboard: "/" focuses scan
+      window.addEventListener('keydown', (e) => {
+        if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          scanInput.focus();
+          scanInput.select();
+        }
+      });
+
+      // Keep pill in sync
+      sessionType.addEventListener('change', () => {
+        sessionPill.textContent = sessionType.value;
+        sessionPill.className = 'pill ' + (sessionType.value === 'AM' ? 'am' : 'pm');
+      });
+
+      // Scan lookup
+      scanInput.addEventListener('change', onScan);
+      scanInput.addEventListener('input', delayedLookup);
+      grossInput.addEventListener('input', recalcNetVariance);
+
+      addEntryBtn.addEventListener('click', onAddEntry);
+      clearFormBtn.addEventListener('click', clearForm);
+
+      saveProductBtn.addEventListener('click', onSaveProduct);
+      deleteProductBtn.addEventListener('click', onDeleteProduct);
+      importSampleBtn.addEventListener('click', loadDemo);
+      exportRegistryBtn.addEventListener('click', exportRegistryCSV);
+
+      exportCsvBtn.addEventListener('click', exportLogCSV);
+      clearTodayBtn.addEventListener('click', clearToday);
+      finalizeBtn.addEventListener('click', finalizeSession);
+
+      openSettingsBtn.addEventListener('click', openSettings);
+      settingsDlg.addEventListener('close', onSettingsClose);
+
+      // Update stats periodically in case of time/day change
+      setInterval(updateStats, 15000);
+    }
+
+    function updateThresholdChip(){
+      thresholdChip.textContent = `${Number(state.settings.varianceThreshold || 5)} g`;
+    }
+
+    function onScan(){
+      const id = scanInput.value.trim();
+      if (!id) return;
+      const rec = state.registry[id];
+      if (rec){
+        regId.value = id; regName.value = rec.name || ''; regTare.value = rec.tare || '';
+        tareInput.value = Number(rec.tare || 0).toFixed(2);
+        recalcNetVariance();
+      } else {
+        // Pre-fill registry form with scanned ID
+        regId.value = id; regName.value = ''; regTare.value = '';
+        tareInput.value = '';
+        netOutput.value = '';
+        varianceOutput.value = '';
+        toast(`Unknown Product ID “${id}”. Add it in the registry (right panel).`);
+        regName.focus();
+      }
+    }
+
+    let lookupTimer;
+    function delayedLookup(){
+      clearTimeout(lookupTimer);
+      lookupTimer = setTimeout(onScan, 200);
+    }
+
+    function recalcNetVariance(){
+      const gross = parseFloat(grossInput.value);
+      const tare = parseFloat(tareInput.value);
+      if (isFinite(gross) && isFinite(tare)){
+        const net = Math.max(0, gross - tare);
+        netOutput.value = net.toFixed(2);
+        const variance = computeVariance(scanInput.value.trim(), vaultSize.value, net);
+        if (variance === null){
+          varianceOutput.value = '';
+        } else {
+          varianceOutput.value = variance.toFixed(2);
+        }
+      } else {
+        netOutput.value = '';
+        varianceOutput.value = '';
+      }
+    }
+
+    function computeVariance(productId, vault, netNow){
+      if (!productId || !isFinite(netNow)) return null;
+      // Find last entry for this product & vault (any session), prior to now
+      const filtered = state.log
+        .filter(e => e.productId === productId && e.vault === vault)
+        .sort((a,b) => a.ts - b.ts);
+      if (filtered.length === 0) return 0;
+      const last = filtered[filtered.length - 1];
+      const lastNet = last.net;
+      return netNow - lastNet;
+    }
+
+    function onAddEntry(){
+      const productId = scanInput.value.trim();
+      const product = state.registry[productId];
+      const gross = parseFloat(grossInput.value);
+      const tare = parseFloat(tareInput.value);
+      const net = parseFloat(netOutput.value);
+
+      if (!productId){ return toast('Scan or enter a Product ID first.'); }
+      if (!product){ return toast('Unknown Product ID. Please add to registry with a tare.'); }
+      if (!isFinite(gross)){ return toast('Enter the gross weight (g).'); }
+      if (!isFinite(tare)){ return toast('Tare is missing — check registry.'); }
+      if (!isFinite(net)){ return toast('Net could not be calculated.'); }
+
+      const variance = computeVariance(productId, vaultSize.value, net) ?? 0;
+      const entry = {
+        ts: Date.now(),
+        date: sessionDate.value || todayStr(),
+        employee: employeeInput.value.trim() || '',
+        session: sessionType.value,
+        vault: vaultSize.value,
+        productId,
+        name: product.name || '',
+        tare: round2(tare),
+        gross: round2(gross),
+        net: round2(net),
+        variance: round2(variance),
+        notes: notesInput.value.trim() || ''
+      };
+      state.log.push(entry);
+      saveLog();
+      clearForm(true);
+      toast('Entry added.');
+    }
+
+    function clearForm(keepScan=false){
+      if (!keepScan) scanInput.value = '';
+      grossInput.value = '';
+      tareInput.value = '';
+      netOutput.value = '';
+      varianceOutput.value = '';
+      notesInput.value = '';
+      if (!keepScan) scanInput.focus();
+    }
+
+    function round2(n){ return Math.round(n * 100) / 100; }
+
+    function renderLog(){
+      const threshold = Number(state.settings.varianceThreshold || 5);
+      const today = sessionDate.value || todayStr();
+
+      // Only show today’s entries (by chosen session date)
+      const rows = state.log.filter(e => e.date === today).sort((a,b) => a.ts - b.ts);
+      // Stats
+      let flagged = 0;
+
+      logBody.innerHTML = rows.map(e => {
+        const d = new Date(e.ts);
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        const varianceClass = Math.abs(e.variance) >= threshold ? 'danger' : '';
+        if (varianceClass) flagged++;
+        return `<tr>
+          <td>${hh}:${mm}</td>
+          <td><span class="pill ${e.session === 'AM' ? 'am' : 'pm'}">${e.session}</span></td>
+          <td>${e.vault}</td>
+          <td>${escapeHtml(e.productId)}</td>
+          <td>${escapeHtml(e.name || '')}</td>
+          <td class="right">${fmt(e.tare)}</td>
+          <td class="right">${fmt(e.gross)}</td>
+          <td class="right">${fmt(e.net)}</td>
+          <td class="right">${e.variance === null || Number.isNaN(e.variance) ? '' : `<span class="pill ${varianceClass}">${fmt(e.variance)}</span>`}</td>
+          <td>${escapeHtml(e.notes || '')}</td>
+        </tr>`;
+      }).join('');
+
+      statFlags.textContent = String(flagged);
+      statEntries.textContent = String(rows.length);
+    }
+
+    function updateStats(){
+      statProducts.textContent = String(Object.keys(state.registry).length);
+      renderLog();
+    }
+
+    function fmt(n){
+      if (n === null || n === undefined || Number.isNaN(n)) return '';
+      return Number(n).toFixed(2);
+    }
+
+    function onSaveProduct(){
+      const id = regId.value.trim();
+      const name = regName.value.trim();
+      const tare = parseFloat(regTare.value);
+      if (!id) return toast('Enter a Product ID.');
+      if (!isFinite(tare)) return toast('Enter a valid tare (g).');
+      state.registry[id] = { name, tare: round2(tare) };
+      saveRegistry();
+      toast('Product saved.');
+      // If this is the scanned product, reflect tar e into calc fields.
+      if (scanInput.value.trim() === id){
+        tareInput.value = round2(tare).toFixed(2);
+        recalcNetVariance();
+      }
+    }
+
+    function onDeleteProduct(){
+      const id = regId.value.trim();
+      if (!id) return toast('Enter a Product ID to delete.');
+      if (!state.registry[id]) return toast('No such Product ID in registry.');
+      if (!confirm(`Delete Product ID “${id}”?`)) return;
+      delete state.registry[id];
+      saveRegistry();
+      toast('Product removed.');
+      if (scanInput.value.trim() === id){
+        tareInput.value = '';
+        netOutput.value = '';
+        varianceOutput.value = '';
+      }
+    }
+
+    function loadDemo(){
+      const demo = {
+        "GLW-FOH": { name: "Gluwberry FOH Vault", tare: 345.80 },
+        "GLW-BOH": { name: "Gluwberry Big Vault", tare: 1287.30 },
+        "ZKZ-FOH": { name: "ZkittleZ FOH Vault", tare: 351.20 },
+        "GSC-BOH": { name: "GSC Big Vault", tare: 1279.50 }
+      };
+      state.registry = Object.assign({}, state.registry, demo);
+      saveRegistry();
+      toast('Demo products loaded.');
+    }
+
+    function exportRegistryCSV(){
+      const rows = [['product_id','name','tare_g']];
+      for (const [id, rec] of Object.entries(state.registry)){
+        rows.push([id, rec.name || '', String(rec.tare ?? '')]);
+      }
+      downloadCSV(rows, `registry_${todayStr()}.csv`);
+    }
+
+    function exportLogCSV(){
+      const rows = [['timestamp_iso','date','time','employee','session','vault','product_id','name','tare_g','gross_g','net_g','variance_g','notes']];
+      for (const e of state.log){
+        const iso = new Date(e.ts).toISOString();
+        const dt = new Date(e.ts);
+        const time = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+        rows.push([iso, e.date, time, e.employee, e.session, e.vault, e.productId, e.name || '', fmt(e.tare), fmt(e.gross), fmt(e.net), fmt(e.variance), (e.notes||'').replace(/\n/g,' ')]);
+      }
+      downloadCSV(rows, `deli_log_${todayStr()}.csv`);
+    }
+
+    function downloadCSV(rows, filename){
+      const csv = rows.map(r => r.map(cell => {
+        const s = String(cell ?? '');
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+      }).join(',')).join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function clearToday(){
+      const d = sessionDate.value || todayStr();
+      if(!confirm(`Clear entries for ${d}? This keeps history for other days.`)) return;
+      state.log = state.log.filter(e => e.date !== d);
+      saveLog();
+      toast('Today cleared.');
+    }
+
+    function finalizeSession(){
+      const d = sessionDate.value || todayStr();
+      const s = sessionType.value;
+      const count = state.log.filter(e => e.date === d && e.session === s).length;
+      alert(`Session ${s} on ${d} finalized.\nEntries: ${count}\n\nReminder:\n• Move small vaults BOH at close (PM)\n• Ensure all product is in Fulfillment`);
+    }
+
+    function openSettings(){
+      thresholdInput.value = state.settings.varianceThreshold ?? 5;
+      storeNameInput.value = state.settings.storeName ?? '';
+      settingsDlg.showModal();
+    }
+    function onSettingsClose(e){
+      if (settingsDlg.returnValue === 'cancel') return;
+      const thr = parseFloat(thresholdInput.value);
+      state.settings.varianceThreshold = isFinite(thr) ? thr : 5;
+      state.settings.storeName = storeNameInput.value.trim();
+      saveSettings();
+      renderLog();
+      toast('Settings saved.');
+    }
+
+    function toast(msg){
+      const el = document.createElement('div');
+      el.textContent = msg;
+      Object.assign(el.style, {
+        position:'fixed', left:'50%', bottom:'26px', transform:'translateX(-50%)',
+        background:'#10182a', color:'#e8ecf3', border:'1px solid #26304a', padding:'10px 14px',
+        borderRadius:'12px', zIndex:'9999', boxShadow:'0 10px 30px rgba(0,0,0,.35)'
+      });
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2400);
+    }
+
+    function escapeHtml(s){
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+
+    // Kickoff
+    init();
+  })();
+  </script>
+</body>
 </html>
